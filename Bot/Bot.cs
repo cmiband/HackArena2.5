@@ -83,10 +83,21 @@ public class Bot : IBot
         DEF
     }
 
-    public void checkState()
+    public bool AmInZone(GameState gameState)
     {
-        // TODO: zrobić ustawianie na podstawie pozycji strefa czy nie strefa
-        currentState = State.GAZ;
+        var pos = GetPlayerPosition(gameState);
+        if (pos == null)
+        {
+            return false;
+        }
+        foreach (var zone in gameState.Zones)
+        {
+            if (((zone.X < pos.x) && pos.x < (zone.X + zone.Width)) && ((zone.Y < pos.y) && (pos.y < zone.Y + zone.Height)))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     public void OnSubsequentLobbyData(LobbyData lobbyData) { }
@@ -333,8 +344,7 @@ public class Bot : IBot
             }
         }
         */
-        
-        this.currentState = this.CalculateCurrentState();
+        this.currentState = this.CalculateCurrentState(gameState);
         BotResponse response = this.GetBotResponseBasedOnState(this.currentState, gameState);
 
         
@@ -355,31 +365,146 @@ public class Bot : IBot
 
     private BotResponse GetBotResponseBasedOnState(State playerState, GameState gameState)
     {
-        switch(playerState)
+        switch (playerState)
         {
             case State.DEF:
+                Console.WriteLine("DEF");
                 return this.HandleDefense(gameState);
+
+            case State.GAZ:
+                Console.WriteLine("GAZ");
+                return this.HandleGaz(gameState);
 
             default:
                 return BotResponse.Pass();
         }
     }
 
-    private State CalculateCurrentState()
+    private BotResponse HandleGaz(GameState gameState)
     {
-        State result = State.DEF;
+        return BotResponse.GoTo(4, 10, Rotation.Left, new(0, 1, 2), new(null, null, null, null, null, null));
+    }
 
-
-
-        return result;
+    private State CalculateCurrentState(GameState gameState)
+    {
+        if (AmInZone(gameState))
+        {
+            //jestesmy w strefie, tutaj dalsze decyzje, na razie DEF na twardo dany
+            return State.DEF;
+        }
+        else
+        {
+            //nie ma nas w strefie, zapierdalamy do strefy
+            return State.GAZ;
+        }
     }
 
     private BotResponse HandleDefense(GameState gameState)
     {
         List<EnemyWrapper> enemies = this.GetEnemyPositions(gameState);
-        PositionWrapper currentPlayerPosition = this.GetPlayerPosition(gameState);
+        PositionWrapper? currentPlayerPosition = this.GetPlayerPosition(gameState);
+        List<string> intersections = this.GetEnemiesIntersectingWithPlayers(enemies, currentPlayerPosition, gameState);
 
         return BotResponse.Pass();         
+    }
+
+    private List<string> GetEnemiesIntersectingWithPlayers(List<EnemyWrapper> enemies, PositionWrapper player, GameState gameState)
+    {
+        List<string> result = new List<string>();
+
+        for(int i = 0; i<enemies.Count; i++)
+        {
+            EnemyWrapper enemy = enemies[i];
+            string axis = this.CheckIfCoordsMatch(enemy.position, player);
+
+            if (axis != "")
+            {
+                bool isIntersecting = this.CheckIfThereIsNoBlocksBetweenTanks(gameState, enemy.position, player, axis);
+
+                if(isIntersecting)
+                {
+                    result.Add(axis);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private bool CheckIfThereIsNoBlocksBetweenTanks(GameState gameState, PositionWrapper enemy, PositionWrapper player, string axis)
+    {
+        if(axis == "x")
+        {
+            int yPos = player.y;
+            int smallerPosition = Math.Min(player.x, enemy.x);
+            int biggerPosition = Math.Max(player.x, enemy.x);
+
+            if(biggerPosition-smallerPosition == 1)
+            {
+                return true;
+            }
+
+            for(int i = smallerPosition+1; i < biggerPosition; i++)
+            {
+                Tile checkedTile = gameState.Map[yPos, i];
+
+                if(!this.CheckIfTileIsClear(checkedTile))
+                {
+                    return false;
+                }
+            }
+        } 
+        else
+        {
+            int xPos = player.x;
+            int smallerPosition = Math.Min(player.y, enemy.y);
+            int biggerPosition = Math.Max(player.y, enemy.y);
+
+            if (biggerPosition - smallerPosition == 1)
+            {
+                return true;
+            }
+
+            for (int i = smallerPosition + 1; i < biggerPosition; i++)
+            {
+                Tile checkedTile = gameState.Map[i, xPos];
+
+                if (!this.CheckIfTileIsClear(checkedTile))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private bool CheckIfTileIsClear(Tile t)
+    {
+        foreach (var entity in t.Entities)
+        {
+            if (entity is Tile.OwnHeavyTank || entity is Tile.OwnLightTank || entity is Tile.Wall)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private string CheckIfCoordsMatch(PositionWrapper enemy, PositionWrapper player)
+    {
+        if(enemy.y == player.y)
+        {
+            return "x";
+        }
+
+        if (enemy.x == player.x)
+        {
+            return "y";
+        }
+
+        return "";
     }
 
     private List<EnemyWrapper> GetEnemyPositions(GameState gameState)
