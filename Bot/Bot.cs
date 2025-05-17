@@ -2,6 +2,7 @@
 using StereoTanksBotLogic.Enums;
 using StereoTanksBotLogic.Models;
 using System.Collections.Generic;
+using System.Security.Principal;
 using System.Text;
 
 namespace Bot;
@@ -94,7 +95,7 @@ public class Bot : IBot
         }
         foreach (var zone in gameState.Zones)
         {
-            if (((zone.X <= pos.x) && pos.x <= (zone.X + zone.Width)) && ((zone.Y <= pos.y) && (pos.y <= zone.Y + zone.Height)))
+            if (((zone.X <= pos.x) && pos.x <= (zone.X + zone.Width)) && ((zone.Y <= pos.y) && (pos.y < zone.Y + zone.Height)))
             {
                 return true;
             }
@@ -117,10 +118,11 @@ public class Bot : IBot
         switch (playerState)
         {
             case State.DEF_LIGHT:
-                Console.WriteLine("DEF");
+                Console.WriteLine("DEFL");
                 return this.HandleLightDefense(gameState);
-            case State.DEF_HEAVY: 
-              return this.HandleHeavyDefense(gameState);
+            case State.DEF_HEAVY:
+                Console.WriteLine("DEFH");
+                return this.HandleHeavyDefense(gameState);
             case State.GAZ:
                 Console.WriteLine("GAZ");
                 return this.HandleGaz(gameState);
@@ -191,9 +193,32 @@ public class Bot : IBot
 
     private BotResponse HandleGaz(GameState gameState)
     {
-        PositionWrapper zoneCoord = this.GetValidZoneCoord(gameState);
+        // jak jestesmy LIGHT i zapierdalamy do strefy to sprawdza czy może radaru użyć (jeżeli da cokolwiek) i używa
+        if (currentTankType == TankType.Light && GetEnemyPositions(gameState).Count < 2)
+        {
+            for (int y = 0; y < gameState.Map.GetLength(0); y++)
+            {
+                for (int x = 0; x < gameState.Map.GetLength(1); x++)
+                {
+                    Tile tile = gameState.Map[y, x];
 
-        return BotResponse.GoTo(zoneCoord.x, zoneCoord.y, Rotation.Left, new(0, 1, 2), new(null, null, null, null, null, null));
+                    foreach (var entity in gameState.Map[y, x].Entities)
+                    {
+                        if (entity is Tile.OwnLightTank tank)
+                        {
+                            if (tank.TicksToRadar == null || tank.TicksToRadar <= 0)
+                            {
+                                return BotResponse.UseAbility(AbilityType.UseRadar);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // defaultowo zapierdala na pierwszy możliwy punkt w strefie
+        PositionWrapper zoneCoord = this.GetValidZoneCoord(gameState);
+        return BotResponse.GoTo(zoneCoord.x, zoneCoord.y, null, new(0, 1, 2), new(0, 100, 35, 80, 100, null));
     }
 
     private PositionWrapper GetValidZoneCoord(GameState gameState)
@@ -267,7 +292,7 @@ public class Bot : IBot
 
     private BotResponse HandleHeavyDefense(GameState gameState)
     {
-        return BotResponse.Pass();
+        return BotResponse.CaptureZone();
     }
 
     private BotResponse HandleLightDefense(GameState gameState)
@@ -531,7 +556,7 @@ public class Bot : IBot
 
     public void OnGameStarting()
     {
-        // Define what your program should do when game is starting.
+        currentState = State.GAZ;
     }
 
     public void OnWarningReceived(Warning warning, string? message)
