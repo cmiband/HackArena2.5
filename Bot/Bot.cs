@@ -22,21 +22,15 @@ public class Bot : IBot
     private int heavyCounter = 0;
     private int lightSpinCounter = 0;
 
+    private int securityTicks = 0;
+
     public Bot(LobbyData lobbyData)
     {
         this.myId = lobbyData.PlayerId;
         this.myTeamName = lobbyData.TeamName;
 
-        Console.WriteLine(lobbyData);
-        Console.WriteLine("players");
-        Console.WriteLine(lobbyData.Teams);
-        Console.WriteLine("ep");
-
         List<LobbyPlayer> allPlayers = concatPlayers(lobbyData.Teams);
         this.currentTankType = this.GetTankType(allPlayers);
-
-        Console.WriteLine(this.currentTankType.ToString());
-
     }
 
     private List<LobbyPlayer> concatPlayers(LobbyTeam[] teams)
@@ -55,7 +49,6 @@ public class Bot : IBot
 
     private TankType? GetTankType(List<LobbyPlayer> players)
     {
-        Console.WriteLine("My id: " + this.myId);
         TankType? myTankType = this.FindTypeInArray(players);
         if(myTankType == null)
         {
@@ -124,17 +117,13 @@ public class Bot : IBot
         switch (playerState)
         {
             case State.DEF_LIGHT:
-                Console.WriteLine("DEFL");
                 return this.HandleLightDefense(gameState);
             case State.DEF_HEAVY:
-                Console.WriteLine("DEFH");
                 return this.HandleHeavyDefense(gameState);
             case State.GAZ:
-                Console.WriteLine("GAZ");
                 return this.HandleGaz(gameState);
 
             case State.OFF:
-                Console.WriteLine("OFF");
                 return this.HandleOffense(gameState);
 
             default:
@@ -301,6 +290,7 @@ public class Bot : IBot
                 }
             }
         }
+
         heavyCounter++;
         return BotResponse.CaptureZone();
     }
@@ -376,7 +366,6 @@ public class Bot : IBot
 
         if(this.lightCounter == 0)
         {
-            Console.WriteLine("cap");
             lightCounter = 1;
             if (this.AmInZone(gameState))
             {
@@ -385,7 +374,6 @@ public class Bot : IBot
         }
         else if(this.lightCounter == 1)
         {
-            Console.WriteLine("rot");
             if (lightSpinCounter < 5)
             {
                 lightSpinCounter++;
@@ -397,14 +385,14 @@ public class Bot : IBot
         } 
         else if(this.lightCounter == 2)
         {
-            Console.WriteLine("go on");
             lightCounter = 0;
         }
 
         PositionWrapper? currentPos = new PositionWrapper(1,1);
-        if (this.queuedPositions.Count == 0)
+        if (this.queuedPositions.Count == 0 || this.securityTicks > 15)
         {
             this.queuedPositions = this.getPositionsAroundZone(gameState);
+            securityTicks = 0;
         } 
         else
         {
@@ -423,109 +411,9 @@ public class Bot : IBot
                 }
             }
         }
-
-        Console.WriteLine("targeted pos" + currentPos.x + " " + currentPos.y);        
-
+      
+        securityTicks++;
         return BotResponse.GoTo(currentPos.x, currentPos.y, Rotation.Left, new(0, 1, 1), new(0, 2, 2, 2, 10, null));
-    }
-
-    private List<string> GetEnemiesIntersectingWithPlayers(List<EnemyWrapper> enemies, PositionWrapper player, GameState gameState)
-    {
-        List<string> result = new List<string>();
-
-        for(int i = 0; i<enemies.Count; i++)
-        {
-            EnemyWrapper enemy = enemies[i];
-            string axis = this.CheckIfCoordsMatch(enemy.position, player);
-
-            if (axis != "")
-            {
-                bool isIntersecting = this.CheckIfThereIsNoBlocksBetweenTanks(gameState, enemy.position, player, axis);
-
-                if(isIntersecting)
-                {
-                    result.Add(axis);
-                }
-            }
-        }
-
-        return result;
-    }
-
-    private bool CheckIfThereIsNoBlocksBetweenTanks(GameState gameState, PositionWrapper enemy, PositionWrapper player, string axis)
-    {
-        if(axis == "x")
-        {
-            int yPos = player.y;
-            int smallerPosition = Math.Min(player.x, enemy.x);
-            int biggerPosition = Math.Max(player.x, enemy.x);
-
-            if(biggerPosition-smallerPosition == 1)
-            {
-                return true;
-            }
-
-            for(int i = smallerPosition+1; i < biggerPosition; i++)
-            {
-                Tile checkedTile = gameState.Map[yPos, i];
-                
-                if(!this.CheckIfTileIsClear(checkedTile))
-                {
-                    return false;
-                }
-            }
-        } 
-        else
-        {
-            int xPos = player.x;
-            int smallerPosition = Math.Min(player.y, enemy.y);
-            int biggerPosition = Math.Max(player.y, enemy.y);
-
-            if (biggerPosition - smallerPosition == 1)
-            {
-                return true;
-            }
-
-            for (int i = smallerPosition + 1; i < biggerPosition; i++)
-            {
-                Tile checkedTile = gameState.Map[i, xPos];
-
-                if (!this.CheckIfTileIsClear(checkedTile))
-                {
-                    return false;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    private bool CheckIfTileIsClear(Tile t)
-    {
-        foreach (var entity in t.Entities)
-        {
-            if (entity is Tile.OwnHeavyTank || entity is Tile.OwnLightTank || entity is Tile.Wall)
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private string CheckIfCoordsMatch(PositionWrapper enemy, PositionWrapper player)
-    {
-        if(enemy.y == player.y)
-        {
-            return "x";
-        }
-
-        if (enemy.x == player.x)
-        {
-            return "y";
-        }
-
-        return "";
     }
 
     private List<EnemyWrapper> GetEnemyPositions(GameState gameState)
@@ -803,11 +691,6 @@ public class Bot : IBot
     {
         // Define what your program should do when game is finished.
         GameEndTeam winner = gameEnd.Teams[0];
-
-        foreach (var team in gameEnd.Teams)
-        {
-            Console.WriteLine($"{team.Name} - {team.Score}");
-        }
     }
 
     public void OnGameStarting()
@@ -817,31 +700,7 @@ public class Bot : IBot
 
     public void OnWarningReceived(Warning warning, string? message)
     {
-        // Define what your program should do when game is warning is recieved.
-
-        switch (warning)
-        {
-            case Warning.PlayerAlreadyMadeActionWarning:
-                {
-                    Console.WriteLine("Player already made action warning");
-                    break;
-                }
-            case Warning.SlowResponseWarning:
-                {
-                    Console.WriteLine("Slow response warning");
-                    break;
-                }
-            case Warning.ActionIgnoredDueToDeadWarning:
-                {
-                    Console.WriteLine("Action ignored due to dead warning");
-                    break;
-                }
-            case Warning.CustomWarning:
-                {
-                    Console.WriteLine($"Custom warning: {message ?? "no message"}");
-                    break;
-                }
-        }
+        // Define what your program should do when game is warning is recieved
     }
 
     class EnemyWrapper
