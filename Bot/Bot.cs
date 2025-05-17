@@ -1,6 +1,7 @@
 ﻿using StereoTanksBotLogic;
 using StereoTanksBotLogic.Enums;
 using StereoTanksBotLogic.Models;
+using System;
 using System.Collections.Generic;
 using System.Security.Principal;
 using System.Text;
@@ -18,6 +19,7 @@ public class Bot : IBot
     private bool wasAlreadyInZone = false;
 
     private int lightCounter = 0;
+    private int heavyCounter = 0;
 
     public Bot(LobbyData lobbyData)
     {
@@ -280,6 +282,25 @@ public class Bot : IBot
 
     private BotResponse HandleHeavyDefense(GameState gameState)
     {
+        if(heavyCounter % 2 == 0)
+        {
+            for (int y = 0; y < gameState.Map.GetLength(0); y++)
+            {
+                for (int x = 0; x < gameState.Map.GetLength(1); x++)
+                {
+                    Tile tile = gameState.Map[y, x];
+
+                    foreach (var entity in gameState.Map[y, x].Entities)
+                    {
+                        if (entity is Tile.OwnHeavyTank heavy)
+                        {
+                            return BotResponse.Rotate(null, Rotation.Left);
+                        }
+                    }
+                }
+            }
+        }
+        heavyCounter++;
         return BotResponse.CaptureZone();
     }
 
@@ -509,6 +530,35 @@ public class Bot : IBot
         return result;
     }
 
+    private List<EnemyWrapper> GetFriendlyPositions(GameState gameState)
+    {
+        List<EnemyWrapper> result = new List<EnemyWrapper>();
+
+        for (int y = 0; y < gameState.Map.GetLength(0); y++)
+        {
+            for (int x = 0; x < gameState.Map.GetLength(1); x++)
+            {
+                Tile tile = gameState.Map[y, x];
+
+                foreach (var entity in gameState.Map[y, x].Entities)
+                {
+                    if (entity is Tile.OwnLightTank)
+                    {
+                        EnemyWrapper enemy = new EnemyWrapper();
+                        PositionWrapper position = new PositionWrapper();
+
+                        position.x = x;
+                        position.y = y;
+                        enemy.position = position;
+                        result.Add(enemy);
+                    }
+                }
+            }
+        }
+
+        return result;
+    }
+
     private EnemyWrapper? FindClosestEnemy(List<EnemyWrapper> enemies, GameState gameState)
     {
         if(enemies.Count == 0)
@@ -578,6 +628,13 @@ public class Bot : IBot
     {
         PositionWrapper myPosition = GetPlayerPosition(gameState);
         if (enemy.position.x == myPosition.x || enemy.position.y == myPosition.y) return true;
+        return false;
+    }
+
+    private bool isFriendlyOnTheSameAxis(EnemyWrapper friendly, GameState gameState)
+    {
+        PositionWrapper myPosition = GetPlayerPosition(gameState);
+        if (friendly.position.x == myPosition.x || friendly.position.y == myPosition.y) return true;
         return false;
     }
 
