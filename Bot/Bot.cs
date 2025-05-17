@@ -341,21 +341,61 @@ public class Bot : IBot
 
     private BotResponse HandleGaz(GameState gameState)
     {
-        return BotResponse.GoTo(4, 10, Rotation.Left, new(0, 1, 2), new(null, null, null, null, null, null));
+        PositionWrapper zoneCoord = this.GetValidZoneCoord(gameState);
+
+        return BotResponse.GoTo(zoneCoord.x, zoneCoord.y, Rotation.Left, new(0, 1, 2), new(null, null, null, null, null, null));
+    }
+
+    private PositionWrapper GetValidZoneCoord(GameState gameState)
+    {
+        List<PositionWrapper> zoneCoords = new List<PositionWrapper>();
+        Zone z = gameState.Zones[0];
+
+        for (int i = z.X; i<z.X+z.Width; i++)
+        {
+            for(int j = z.Y; j<z.Y+z.Height; j++)
+            {
+                PositionWrapper pw = new PositionWrapper();
+                pw.x = i;
+                pw.y = j;
+
+                zoneCoords.Add(pw);
+            }
+        }
+
+        List<PositionWrapper> filteredResult = new List<PositionWrapper>();
+
+        for(int i = 0; i<zoneCoords.Count; i++)
+        {
+            PositionWrapper currentCoords = zoneCoords[i];
+            Tile.TileEntity[] te = gameState.Map[currentCoords.y, currentCoords.x].Entities;
+
+            if(te.Length == 0)
+            {
+                filteredResult.Add(currentCoords);
+                continue;
+            }
+
+            foreach(Tile.TileEntity t in te) {
+                if (!(t is Tile.Wall))
+                {
+                    
+                    filteredResult.Add(currentCoords);
+                }
+            }
+        }
+
+        return filteredResult[0];
     }
 
     private State CalculateCurrentState(GameState gameState)
     {
         if (AmInZone(gameState))
         {
-            //jestesmy w strefie, tutaj dalsze decyzje, na razie DEF na twardo dany
             return State.DEF;
         }
-        else
-        {
-            //nie ma nas w strefie, zapierdalamy do strefy
-            return State.GAZ;
-        }
+
+        return State.GAZ;
     }
 
     private BotResponse HandleDefense(GameState gameState)
