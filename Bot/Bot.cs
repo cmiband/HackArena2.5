@@ -17,6 +17,8 @@ public class Bot : IBot
     private List<PositionWrapper> queuedPositions = new List<PositionWrapper>();
     private bool wasAlreadyInZone = false;
 
+    private int lightCounter = 0;
+
     public Bot(LobbyData lobbyData)
     {
         this.myId = lobbyData.PlayerId;
@@ -91,7 +93,7 @@ public class Bot : IBot
         }
         foreach (var zone in gameState.Zones)
         {
-            if (((zone.X <= pos.x) && pos.x <= (zone.X + zone.Width)) && ((zone.Y <= pos.y) && (pos.y < zone.Y + zone.Height)))
+            if (((zone.X <= pos.x) && pos.x < (zone.X + zone.Width)) && ((zone.Y <= pos.y) && (pos.y < zone.Y + zone.Height)))
             {
                 return true;
             }
@@ -245,8 +247,8 @@ public class Bot : IBot
     private State CalculateCurrentState(GameState gameState)
     {
         List<EnemyWrapper> enemies = this.GetEnemyPositions(gameState);
-        PositionWrapper? playerPos = this.GetPlayerPosition(gameState);
-        List<string> intersections = this.GetEnemiesIntersectingWithPlayers(enemies, playerPos, gameState);
+        EnemyWrapper? closest = this.FindClosestEnemy(enemies, gameState);
+        bool isEnemyOnSameAxis = closest != null ? this.isEnemyOnTheSameAxis(closest, gameState) : false;
         bool isInZone = AmInZone(gameState);
 
         if (isInZone || wasAlreadyInZone)
@@ -255,8 +257,8 @@ public class Bot : IBot
             {
                wasAlreadyInZone = true;
             }
-            
-            if(intersections.Count == 0)
+
+            if(!isEnemyOnSameAxis)
             {
                 if(this.currentTankType == TankType.Heavy)
                 {
@@ -354,7 +356,8 @@ public class Bot : IBot
         if (this.queuedPositions.Count == 0)
         {
             this.queuedPositions = this.getPositionsAroundZone(gameState);
-        } else
+        } 
+        else
         {
             currentPos = this.queuedPositions[0];
 
@@ -414,7 +417,7 @@ public class Bot : IBot
             for(int i = smallerPosition+1; i < biggerPosition; i++)
             {
                 Tile checkedTile = gameState.Map[yPos, i];
-
+                
                 if(!this.CheckIfTileIsClear(checkedTile))
                 {
                     return false;
@@ -503,8 +506,13 @@ public class Bot : IBot
         return result;
     }
 
-    private EnemyWrapper FindClosestEnemy(List<EnemyWrapper> enemies, GameState gameState)
+    private EnemyWrapper? FindClosestEnemy(List<EnemyWrapper> enemies, GameState gameState)
     {
+        if(enemies.Count == 0)
+        {
+            return null;
+        }
+
         PositionWrapper myPosition = GetPlayerPosition(gameState);
         List<(int distance, EnemyWrapper enemy)> distances = new List<(int, EnemyWrapper)>();
         int i = 0;
@@ -602,11 +610,11 @@ public class Bot : IBot
                 {
                     if (entity is Tile.OwnHeavyTank heavy && isEnemyOnTheSameAxis(enemy, gameState))
                     {
-                        if (heavy.Turret.TicksToStunBullet == null)
+                        if (heavy.Turret.TicksToStunBullet == null || heavy.Turret.TicksToBullet <= 0)
                         {
                             return BotResponse.UseAbility(AbilityType.FireStunBullet);
                         }
-                        else if(heavy.Turret.TicksToLaser == 0)
+                        else if(heavy.Turret.TicksToLaser == null || heavy.Turret.TicksToBullet <= 0)
                         {
                             return BotResponse.UseAbility(AbilityType.UseLaser);
                         }
@@ -622,14 +630,12 @@ public class Bot : IBot
                     }
                     else if (entity is Tile.OwnLightTank light && isEnemyOnTheSameAxis(enemy, gameState))
                     {
-                        Console.WriteLine(light.Turret.TicksToDoubleBullet);
                         if (light.Turret.TicksToStunBullet == null)
                         {
                             return BotResponse.UseAbility(AbilityType.FireStunBullet);
                         }
                         else if (light.Turret.BulletCount == 0 && light.Turret.TicksToDoubleBullet == null)
                         {
-                            Console.WriteLine("dublet");
                             return BotResponse.UseAbility(AbilityType.FireDoubleBullet);
 
                         }
