@@ -1,6 +1,7 @@
 ﻿using StereoTanksBotLogic;
 using StereoTanksBotLogic.Enums;
 using StereoTanksBotLogic.Models;
+using System.Collections.Generic;
 
 namespace Bot;
 
@@ -19,16 +20,33 @@ public class Bot : IBot
 
         Console.WriteLine(lobbyData);
         Console.WriteLine("players");
-        Console.WriteLine(lobbyData.Players);
+        Console.WriteLine(lobbyData.Teams);
         Console.WriteLine("ep");
-        this.currentTankType = this.GetTankType(lobbyData);
-    
+
+        List<LobbyPlayer> allPlayers = concatPlayers(lobbyData.Teams);
+        this.currentTankType = this.GetTankType(allPlayers);
+
+        Console.WriteLine(this.currentTankType.ToString());
     }
 
-    private TankType? GetTankType(LobbyData lobbyData)
+    private List<LobbyPlayer> concatPlayers(LobbyTeam[] teams)
+    {
+        List<LobbyPlayer> lps = new List<LobbyPlayer>();
+        foreach (var team in teams)
+        {
+            foreach(var player in team.Players)
+            {
+                lps.Add(player);
+            }
+        }
+
+        return lps;
+    }
+
+    private TankType? GetTankType(List<LobbyPlayer> players)
     {
         Console.WriteLine("My id: " + this.myId);
-        TankType? myTankType = this.FindTypeInArray(lobbyData.Players);
+        TankType? myTankType = this.FindTypeInArray(players);
         if(myTankType == null)
         {
             throw new Exception("chuj");
@@ -37,9 +55,9 @@ public class Bot : IBot
         return myTankType;
     }
 
-    private TankType? FindTypeInArray(LobbyPlayer[] players)
+    private TankType? FindTypeInArray(List<LobbyPlayer> players)
     {
-        for(int i = 0; i<players.Length; i++)
+        for(int i = 0; i<players.Count; i++)
         {
             if (players[i].Id == this.myId)
             {
