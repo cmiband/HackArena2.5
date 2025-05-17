@@ -10,10 +10,49 @@ public class Bot : IBot
     private string myTeamName;
     private State currentState;
 
+    private TankType? currentTankType;
+
     public Bot(LobbyData lobbyData)
     {
         this.myId = lobbyData.PlayerId;
         this.myTeamName = lobbyData.TeamName;
+
+        Console.WriteLine(lobbyData);
+        Console.WriteLine("players");
+        Console.WriteLine(lobbyData.Players);
+        Console.WriteLine("ep");
+        this.currentTankType = this.GetTankType(lobbyData);
+    
+    }
+
+    private TankType? GetTankType(LobbyData lobbyData)
+    {
+        Console.WriteLine("My id: " + this.myId);
+        TankType? myTankType = this.FindTypeInArray(lobbyData.Players);
+        if(myTankType == null)
+        {
+            throw new Exception("chuj");
+        }
+
+        return myTankType;
+    }
+
+    private TankType? FindTypeInArray(LobbyPlayer[] players)
+    {
+        for(int i = 0; i<players.Length; i++)
+        {
+            if (players[i].Id == this.myId)
+            {
+                return players[i].TankType;
+            }
+        }
+
+        return null;
+    }
+
+    private bool MatchId(LobbyPlayer lp)
+    {
+        return lp.Id == this.myId;
     }
 
 
