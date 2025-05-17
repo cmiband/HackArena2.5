@@ -1,5 +1,6 @@
-﻿using Newtonsoft.Json;
+﻿    using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using StereoTanksBotLogic.Enums;
 using StereoTanksBotLogic.Models;
 using static StereoTanksBotLogic.Models.Tile;
 
@@ -43,7 +44,7 @@ internal class TileJsonConverter : JsonConverter<Tile>
                         }
                         else
                         {
-                            if (rawPayload.ContainsKey("isUsingRadar"))
+                            if (rawPayload["type"]!.ToObject<TankType>() == TankType.Light)
                             {
                                 entities.Add(rawPayload.ToObject<EnemyLightTank>()!);
                             }
