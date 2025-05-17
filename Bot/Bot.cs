@@ -20,6 +20,7 @@ public class Bot : IBot
 
     private int lightCounter = 0;
     private int heavyCounter = 0;
+    private int lightSpinCounter = 0;
 
     public Bot(LobbyData lobbyData)
     {
@@ -201,7 +202,7 @@ public class Bot : IBot
 
         // defaultowo zapierdala na pierwszy możliwy punkt w strefie
         PositionWrapper zoneCoord = this.GetValidZoneCoord(gameState);
-        return BotResponse.GoTo(zoneCoord.x, zoneCoord.y, null, new(0, 1, 2), new(0, 100, 35, 80, 1000, null));
+        return BotResponse.GoTo(zoneCoord.x, zoneCoord.y, null, new(0, 1, 2), new(0, 2, 2, 2, 10, null));
     }
 
     private PositionWrapper GetValidZoneCoord(GameState gameState)
@@ -373,7 +374,32 @@ public class Bot : IBot
             return BotResponse.UseAbility(AbilityType.UseRadar);
         }
 
-
+        if(this.lightCounter == 0)
+        {
+            Console.WriteLine("cap");
+            lightCounter = 1;
+            if (this.AmInZone(gameState))
+            {
+                return BotResponse.CaptureZone();
+            }
+        }
+        else if(this.lightCounter == 1)
+        {
+            Console.WriteLine("rot");
+            if (lightSpinCounter < 5)
+            {
+                lightSpinCounter++;
+                return BotResponse.Rotate(null, Rotation.Right);
+            } else {
+                lightSpinCounter = 0;
+                lightCounter = 2;
+            }
+        } 
+        else if(this.lightCounter == 2)
+        {
+            Console.WriteLine("go on");
+            lightCounter = 0;
+        }
 
         PositionWrapper? currentPos = new PositionWrapper(1,1);
         if (this.queuedPositions.Count == 0)
@@ -398,8 +424,9 @@ public class Bot : IBot
             }
         }
 
+        Console.WriteLine("targeted pos" + currentPos.x + " " + currentPos.y);        
 
-        return BotResponse.GoTo(currentPos.x, currentPos.y, Rotation.Left, new(0, 1, 2), new(100, 100, 100, 1000, null, null));
+        return BotResponse.GoTo(currentPos.x, currentPos.y, Rotation.Left, new(0, 1, 1), new(0, 2, 2, 2, 10, null));
     }
 
     private List<string> GetEnemiesIntersectingWithPlayers(List<EnemyWrapper> enemies, PositionWrapper player, GameState gameState)
