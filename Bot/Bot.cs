@@ -19,7 +19,6 @@ public class Bot : IBot
 
     public enum State
     {
-        ORIENT,
         GAZ,
         ZONE
     }
@@ -27,7 +26,7 @@ public class Bot : IBot
     public void checkState()
     {
         // TODO: zrobić ustawianie na podstawie pozycji strefa czy nie strefa
-        currentState = State.ORIENT;
+        currentState = State.GAZ;
     }
 
 
