@@ -2,6 +2,7 @@
 using StereoTanksBotLogic.Enums;
 using StereoTanksBotLogic.Models;
 using System.Collections.Generic;
+using System.Text;
 
 namespace Bot;
 
@@ -98,7 +99,8 @@ public class Bot : IBot
     public enum State
     {
         GAZ,
-        ZONE
+        ZONE,
+        DEF
     }
 
     public void checkState()
@@ -106,8 +108,6 @@ public class Bot : IBot
         // TODO: zrobić ustawianie na podstawie pozycji strefa czy nie strefa
         currentState = State.GAZ;
     }
-
-
 
     public void OnSubsequentLobbyData(LobbyData lobbyData) { }
 
@@ -304,10 +304,11 @@ public class Bot : IBot
                 var value = zone.Shares.Values.ToList()[j];
                 Console.WriteLine($"      Key: {key} Value: {value}");
             }
-        }
-
         */
+        this.currentState = this.CalculateCurrentState();
+        BotResponse response = this.GetBotResponseBasedOnState(this.currentState, gameState);
 
+        /*
         //Bot that randomly choses one of all possible bot responses.
         var rand = new Random();
         var X = rand.Next(0,22);
@@ -335,8 +336,114 @@ public class Bot : IBot
             18 => BotResponse.GoTo(X, Y, Rotation.Left, new(0, 0, 0), new(null, null, null, null, null, null)),
             19 => BotResponse.CaptureZone(),
             _ => throw new NotSupportedException(),
-        };
+        };*/
 
+
+        return response;
+    }
+
+    private BotResponse GetBotResponseBasedOnState(State playerState, GameState gameState)
+    {
+        switch(playerState)
+        {
+            case State.DEF:
+                return this.HandleDefense(gameState);
+
+            default:
+                return BotResponse.Pass();
+        }
+    }
+
+    private State CalculateCurrentState()
+    {
+        State result = State.DEF;
+
+
+
+        return result;
+    }
+
+    private BotResponse HandleDefense(GameState gameState)
+    {
+        List<EnemyWrapper> enemies = this.GetEnemyPositions(gameState);
+        PositionWrapper currentPlayerPosition = this.GetPlayerPosition(gameState);
+
+        return BotResponse.Pass();         
+    }
+
+    private List<EnemyWrapper> GetEnemyPositions(GameState gameState)
+    {
+        List<EnemyWrapper> result= new List<EnemyWrapper>();
+
+        for (int y = 0; y < gameState.Map.GetLength(0); y++)
+        {
+            for (int x = 0; x < gameState.Map.GetLength(1); x++)
+            {
+                Tile tile = gameState.Map[y, x];
+
+                foreach (var entity in gameState.Map[y, x].Entities)
+                {
+                    if (entity is Tile.EnemyHeavyTank || entity is Tile.EnemyLightTank)
+                    {
+                        EnemyWrapper enemy = new EnemyWrapper();
+                        PositionWrapper position = new PositionWrapper();
+
+                        position.x = x;
+                        position.y = y;
+                        enemy.position = position;
+                        result.Add(enemy);
+                    }
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private PositionWrapper? GetPlayerPosition(GameState gameState)
+    {
+        for (int y = 0; y < gameState.Map.GetLength(0); y++)
+        {
+            for (int x = 0; x < gameState.Map.GetLength(1); x++)
+            {
+                Tile tile = gameState.Map[y, x];
+
+                foreach (var entity in gameState.Map[y, x].Entities)
+                {
+                    if (entity is Tile.OwnHeavyTank)
+                    {
+                        Tile.OwnHeavyTank? t = entity as Tile.OwnHeavyTank;
+                        
+                        if(t.OwnerId == this.myId)
+                        {
+                            PositionWrapper ps = new PositionWrapper();
+
+                            ps.x = x;
+                            ps.y = y;
+
+                            return ps;
+                        }
+
+
+                    } else if (entity is Tile.OwnLightTank)
+                    {
+                        Tile.OwnLightTank? t = entity as Tile.OwnLightTank;
+
+                        if (t.OwnerId == this.myId)
+                        {
+                            PositionWrapper ps = new PositionWrapper();
+
+                            ps.x = x;
+                            ps.y = y;
+
+                            return ps;
+                        }
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 
     public void OnGameEnd(GameEnd gameEnd)
@@ -382,5 +489,15 @@ public class Bot : IBot
                     break;
                 }
         }
+    }
+
+    class EnemyWrapper
+    {
+        public PositionWrapper? position;
+    }
+
+    class PositionWrapper {
+        public int x;
+        public int y;
     }
 }
