@@ -10,6 +10,12 @@ string teamName = string.Empty;
 TankType tankType = TankType.Light;
 string code = string.Empty;
 
+AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
+{
+    var ex = e.ExceptionObject as Exception ?? new Exception("Unknown AppDomain exception");
+    Console.WriteLine($"[SYSTEM] Unhandled exception in AppDomain: {ex.Message}");
+};
+
 var parser = new Parser(with =>
 {
     with.CaseSensitive = false;
@@ -63,7 +69,16 @@ _ = parserResult.WithNotParsed<CommandLineOptions>((err) =>
     }
 });
 
-BotWebSocketClient client = new(host, port, teamName, tankType, code);
+BotWebSocketClient? client = null;
+
+try
+{
+    client = new(host, port, teamName, tankType, code);
+}
+catch (Exception ex)
+{
+    Console.WriteLine(ex.Message);
+}
 
 var currentDomain = System.AppDomain.CurrentDomain;
 currentDomain.ProcessExit += async (s, e) =>
