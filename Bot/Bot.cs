@@ -70,26 +70,6 @@ public class Bot : IBot
         return null;
     }
 
-    private int[] findMyLocation(GameState gameState)
-    {
-        for (int y = 0; y < gameState.Map.GetLength(0); y++)
-        {
-            for (int x = 0; x < gameState.Map.GetLength(1); x++)
-            {
-                Tile tile = gameState.Map[y, x];
-                foreach (var entity in gameState.Map[y, x].Entities)
-                {
-                    if (entity is Tile.OwnLightTank || entity is Tile.OwnHeavyTank)
-                    {
-                        return new int[] { y, x };
-                    }
-                }
-            }
-                    
-        }
-        return null;
-    }
-
     private bool MatchId(LobbyPlayer lp)
     {
         return lp.Id == this.myId;
@@ -113,11 +93,11 @@ public class Bot : IBot
 
     public BotResponse NextMove(GameState gameState)
     {
-        int[] myLocation = findMyLocation(gameState);
+        PositionWrapper myLocation = this.GetPlayerPosition(gameState);
 
         if (myLocation != null)
         {
-            Console.WriteLine($"Moja pozycja: Y={myLocation[0]}, X={myLocation[1]}");
+            Console.WriteLine($"Moja pozycja: Y={myLocation.y}, X={myLocation.x}");
         }
         else
         {
