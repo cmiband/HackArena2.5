@@ -8,12 +8,29 @@ public class Bot : IBot
 {
     private string myId;
     private string myTeamName;
+    private State currentState;
 
     public Bot(LobbyData lobbyData)
     {
         this.myId = lobbyData.PlayerId;
         this.myTeamName = lobbyData.TeamName;
     }
+
+
+    public enum State
+    {
+        ORIENT,
+        GAZ,
+        ZONE
+    }
+
+    public void checkState()
+    {
+        // TODO: zrobić ustawianie na podstawie pozycji strefa czy nie strefa
+        currentState = State.ORIENT;
+    }
+
+
 
     public void OnSubsequentLobbyData(LobbyData lobbyData) { }
 
@@ -198,6 +215,8 @@ public class Bot : IBot
                 Console.WriteLine($"      Key: {key} Value: {value}");
             }
         }
+
+
 
         //Bot that randomly choses one of all possible bot responses.
         var rand = new Random();
