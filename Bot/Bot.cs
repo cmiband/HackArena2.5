@@ -104,8 +104,66 @@ public class Bot : IBot
 
     public BotResponse NextMove(GameState gameState)
     {
-        /*
 
+        
+        PositionWrapper myLocation = this.GetPlayerPosition(gameState);
+
+        if (myLocation != null)
+        {
+            Console.WriteLine($"Moja pozycja: Y={myLocation.y}, X={myLocation.x}");
+        }
+        else
+        {
+            Console.WriteLine("Nie znaleziono mojego czołgu.");
+        }
+
+        Direction? currentTurretDirection = null;
+
+        foreach (var entity in gameState.Map[myLocation.y, myLocation.x].Entities)
+        {
+            if (entity is Tile.OwnLightTank lightTank)
+            {
+                currentTurretDirection = lightTank.Turret.Direction;
+                break;
+            }
+            else if (entity is Tile.OwnHeavyTank heavyTank)
+            {
+                currentTurretDirection = heavyTank.Turret.Direction;
+                break;
+            }
+        }
+        Console.WriteLine(currentTurretDirection);
+
+        if (GetEnemyPositions(gameState).Count > 0)
+        {
+            Console.WriteLine(GetEnemyPositions(gameState).Count);
+            List<EnemyWrapper> listOfEnemies = GetEnemyPositions(gameState);
+            int turretDirection = FindEnemyDirection(FindClosestEnemy(listOfEnemies, gameState), gameState);
+            if ((int)currentTurretDirection != turretDirection)
+            {
+                int difference = (int)currentTurretDirection - turretDirection;
+
+                if (Math.Abs(difference) == 2)
+                {
+                    BotResponse.Rotate(null, Rotation.Left);
+                    return BotResponse.Rotate(null, Rotation.Left);
+                }
+                else if (difference == -3 || difference == 1)
+                {
+                    return BotResponse.Rotate(null, Rotation.Left);
+                }
+                return BotResponse.Rotate(null, Rotation.Right);
+            }
+        }
+        else
+        {
+            Console.WriteLine("Brak przeciwnikow");
+        }
+        
+
+        
+        
+        /*
         Console.WriteLine($"GameStateId: {gameState.Id}");
         Console.WriteLine($"PlayerId: {gameState.PlayerId}");
         Console.WriteLine($"Tick: {gameState.Tick}");
@@ -284,39 +342,22 @@ public class Bot : IBot
                 var value = zone.Shares.Values.ToList()[j];
                 Console.WriteLine($"      Key: {key} Value: {value}");
             }
+        }
         */
         this.currentState = this.CalculateCurrentState(gameState);
         BotResponse response = this.GetBotResponseBasedOnState(this.currentState, gameState);
 
-        /*
+        
         //Bot that randomly choses one of all possible bot responses.
         var rand = new Random();
         var X = rand.Next(0,22);
         var Y = rand.Next(0,22);
         return rand.Next(0, 19) switch
         {
-            0 => BotResponse.Pass(),
-            1 => BotResponse.Move(MovementDirection.Backward),
-            2 => BotResponse.Move(MovementDirection.Forward),
-            3 => BotResponse.Rotate(null, null),
-            4 => BotResponse.Rotate(null, Rotation.Left),
-            5 => BotResponse.Rotate(null, Rotation.Right),
-            6 => BotResponse.Rotate(Rotation.Left, null),
-            7 => BotResponse.Rotate(Rotation.Left, Rotation.Left),
-            8 => BotResponse.Rotate(Rotation.Left, Rotation.Right),
-            9 => BotResponse.Rotate(Rotation.Right, null),
-            10 => BotResponse.Rotate(Rotation.Right, null),
-            11 => BotResponse.Rotate(Rotation.Right, Rotation.Left),
-            12 => BotResponse.Rotate(Rotation.Right, Rotation.Right),
-            13 => BotResponse.UseAbility(AbilityType.DropMine),
-            14 => BotResponse.UseAbility(AbilityType.FireBullet),
-            15 => BotResponse.UseAbility(AbilityType.FireDoubleBullet),
-            16 => BotResponse.UseAbility(AbilityType.UseLaser),
-            17 => BotResponse.UseAbility(AbilityType.UseRadar),
-            18 => BotResponse.GoTo(X, Y, Rotation.Left, new(0, 0, 0), new(null, null, null, null, null, null)),
-            19 => BotResponse.CaptureZone(),
+            0 => BotResponse.Rotate(Rotation.Left, null),
+            
             _ => throw new NotSupportedException(),
-        };*/
+        };
 
 
         return response;
@@ -535,6 +576,71 @@ public class Bot : IBot
         return result;
     }
 
+    private EnemyWrapper FindClosestEnemy(List<EnemyWrapper> enemies, GameState gameState)
+    {
+        PositionWrapper myPosition = GetPlayerPosition(gameState);
+        List<(int distance, EnemyWrapper enemy)> distances = new List<(int, EnemyWrapper)>();
+        int i = 0;
+        foreach (EnemyWrapper enemy in enemies)
+        {
+            int distance = Math.Abs(enemy.position.x - myPosition.x) + Math.Abs(enemy.position.y - myPosition.y);
+            distances.Add((distance, enemy));
+        }
+
+        return distances.OrderBy(e => e.distance).First().enemy;
+    }
+
+    private int FindEnemyDirection(EnemyWrapper enemy, GameState gameState)
+    {
+        PositionWrapper myPosition = GetPlayerPosition(gameState);
+
+        int dx = enemy.position.x - myPosition.x;
+        int dy = enemy.position.y - myPosition.y;
+
+        int turretDirection;
+
+        
+        int distanceToEnemy = Math.Abs(dx) + Math.Abs(dy);
+
+        if (dy == 0)
+        {
+            turretDirection = dx < 0 ? 3 : 1;
+        }
+        else if (dx == 0)
+        {
+
+            turretDirection = dy < 0 ? 0 : 2;
+        }
+        else
+        {
+
+            double angle = Math.Atan2(dy, dx);
+
+            if (angle >= -Math.PI / 4 && angle < Math.PI / 4)
+            {
+                turretDirection = 1;
+            }
+            else if (angle >= Math.PI / 4 && angle < 3 * Math.PI / 4)
+            {
+                turretDirection = 2;
+            }
+            else if (angle >= -3 * Math.PI / 4 && angle < -Math.PI / 4)
+            {
+                turretDirection = 0;
+            }
+            else
+            {
+                turretDirection = 3;
+            }
+        }
+        return turretDirection;
+    }
+
+
+    private void Attack(EnemyWrapper enemy)
+    {
+
+    }
     private PositionWrapper? GetPlayerPosition(GameState gameState)
     {
         for (int y = 0; y < gameState.Map.GetLength(0); y++)
