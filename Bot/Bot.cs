@@ -104,17 +104,6 @@ public class Bot : IBot
 
     public BotResponse NextMove(GameState gameState)
     {
-        PositionWrapper myLocation = this.GetPlayerPosition(gameState);
-
-        if (myLocation != null)
-        {
-            Console.WriteLine($"Moja pozycja: Y={myLocation.y}, X={myLocation.x}");
-        }
-        else
-        {
-            Console.WriteLine("Nie znaleziono mojego czołgu.");
-        }
-
         /*
 
         Console.WriteLine($"GameStateId: {gameState.Id}");
@@ -335,7 +324,7 @@ public class Bot : IBot
 
     private BotResponse GetBotResponseBasedOnState(State playerState, GameState gameState)
     {
-        switch(playerState)
+        switch (playerState)
         {
             case State.DEF:
                 return this.HandleDefense(gameState);
@@ -357,9 +346,109 @@ public class Bot : IBot
     private BotResponse HandleDefense(GameState gameState)
     {
         List<EnemyWrapper> enemies = this.GetEnemyPositions(gameState);
-        PositionWrapper currentPlayerPosition = this.GetPlayerPosition(gameState);
+        PositionWrapper? currentPlayerPosition = this.GetPlayerPosition(gameState);
+        List<string> intersections = this.GetEnemiesIntersectingWithPlayers(enemies, currentPlayerPosition, gameState);
 
         return BotResponse.Pass();         
+    }
+
+    private List<string> GetEnemiesIntersectingWithPlayers(List<EnemyWrapper> enemies, PositionWrapper player, GameState gameState)
+    {
+        List<string> result = new List<string>();
+
+        for(int i = 0; i<enemies.Count; i++)
+        {
+            EnemyWrapper enemy = enemies[i];
+            string axis = this.CheckIfCoordsMatch(enemy.position, player);
+
+            if (axis != "")
+            {
+                bool isIntersecting = this.CheckIfThereIsNoBlocksBetweenTanks(gameState, enemy.position, player, axis);
+
+                if(isIntersecting)
+                {
+                    result.Add(axis);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private bool CheckIfThereIsNoBlocksBetweenTanks(GameState gameState, PositionWrapper enemy, PositionWrapper player, string axis)
+    {
+        if(axis == "x")
+        {
+            int yPos = player.y;
+            int smallerPosition = Math.Min(player.x, enemy.x);
+            int biggerPosition = Math.Max(player.x, enemy.x);
+
+            if(biggerPosition-smallerPosition == 1)
+            {
+                return true;
+            }
+
+            for(int i = smallerPosition+1; i < biggerPosition; i++)
+            {
+                Tile checkedTile = gameState.Map[yPos, i];
+
+                if(!this.CheckIfTileIsClear(checkedTile))
+                {
+                    return false;
+                }
+            }
+        } 
+        else
+        {
+            int xPos = player.x;
+            int smallerPosition = Math.Min(player.y, enemy.y);
+            int biggerPosition = Math.Max(player.y, enemy.y);
+
+            if (biggerPosition - smallerPosition == 1)
+            {
+                return true;
+            }
+
+            for (int i = smallerPosition + 1; i < biggerPosition; i++)
+            {
+                Tile checkedTile = gameState.Map[i, xPos];
+
+                if (!this.CheckIfTileIsClear(checkedTile))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private bool CheckIfTileIsClear(Tile t)
+    {
+        foreach (var entity in t.Entities)
+        {
+            if (entity is Tile.OwnHeavyTank || entity is Tile.OwnLightTank || entity is Tile.Wall)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private string CheckIfCoordsMatch(PositionWrapper enemy, PositionWrapper player)
+    {
+        if(enemy.y == player.y)
+        {
+            return "x";
+        }
+
+        if (enemy.x == player.x)
+        {
+            return "y";
+        }
+
+        return "";
     }
 
     private List<EnemyWrapper> GetEnemyPositions(GameState gameState)
