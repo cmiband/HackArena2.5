@@ -352,6 +352,8 @@ public class Bot : IBot
             return BotResponse.UseAbility(AbilityType.UseRadar);
         }
 
+
+
         PositionWrapper? currentPos = new PositionWrapper(1,1);
         if (this.queuedPositions.Count == 0)
         {
@@ -374,6 +376,7 @@ public class Bot : IBot
                 }
             }
         }
+
 
         return BotResponse.GoTo(currentPos.x, currentPos.y, Rotation.Left, new(0, 1, 2), new(100, 100, 100, 1000, null, null));
     }
