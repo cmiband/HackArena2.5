@@ -251,8 +251,11 @@ public class Bot : IBot
 
         if (isInZone || wasAlreadyInZone)
         {
-            wasAlreadyInZone = true;
-
+            if (currentTankType == TankType.Light)
+            {
+               wasAlreadyInZone = true;
+            }
+            
             if(intersections.Count == 0)
             {
                 if(this.currentTankType == TankType.Heavy)
