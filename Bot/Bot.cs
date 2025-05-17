@@ -199,7 +199,7 @@ public class Bot : IBot
 
         // defaultowo zapierdala na pierwszy możliwy punkt w strefie
         PositionWrapper zoneCoord = this.GetValidZoneCoord(gameState);
-        return BotResponse.GoTo(zoneCoord.x, zoneCoord.y, null, new(0, 1, 2), new(0, 100, 35, 80, 1000, null));
+        return BotResponse.GoTo(zoneCoord.x, zoneCoord.y, null, new(0, 1, 2), new(0, 2, 2, 2, 10, null));
     }
 
     private PositionWrapper GetValidZoneCoord(GameState gameState)
@@ -378,7 +378,7 @@ public class Bot : IBot
         }
 
 
-        return BotResponse.GoTo(currentPos.x, currentPos.y, Rotation.Left, new(0, 1, 2), new(100, 100, 100, 1000, null, null));
+        return BotResponse.GoTo(currentPos.x, currentPos.y, Rotation.Left, new(0, 1, 1), new(0, 2, 2, 2, 10, null));
     }
 
     private List<string> GetEnemiesIntersectingWithPlayers(List<EnemyWrapper> enemies, PositionWrapper player, GameState gameState)
