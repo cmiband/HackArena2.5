@@ -14,6 +14,8 @@ public class Bot : IBot
     private State currentState;
 
     private TankType? currentTankType;
+    private List<PositionWrapper> queuedPositions = new List<PositionWrapper>();
+    private bool wasAlreadyInZone = false;
 
     public Bot(LobbyData lobbyData)
     {
@@ -71,12 +73,6 @@ public class Bot : IBot
         return null;
     }
 
-    private bool MatchId(LobbyPlayer lp)
-    {
-        return lp.Id == this.myId;
-    }
-
-
     public enum State
     {
         GAZ,
@@ -107,6 +103,11 @@ public class Bot : IBot
 
     public BotResponse NextMove(GameState gameState)
     {
+        if(gameState == null)
+        {
+            return BotResponse.Pass();
+        }
+
         this.currentState = this.CalculateCurrentState(gameState);
         BotResponse response = this.GetBotResponseBasedOnState(this.currentState, gameState);
 
@@ -140,15 +141,6 @@ public class Bot : IBot
     {
         PositionWrapper myLocation = this.GetPlayerPosition(gameState);
 
-        if (myLocation != null)
-        {
-            Console.WriteLine($"Moja pozycja: Y={myLocation.y}, X={myLocation.x}");
-        }
-        else
-        {
-            Console.WriteLine("Nie znaleziono mojego czołgu.");
-        }
-
         Direction? currentTurretDirection = null;
 
         foreach (var entity in gameState.Map[myLocation.y, myLocation.x].Entities)
@@ -164,32 +156,19 @@ public class Bot : IBot
                 break;
             }
         }
-        Console.WriteLine(currentTurretDirection);
 
         if (GetEnemyPositions(gameState).Count > 0)
         {
-            Console.WriteLine(GetEnemyPositions(gameState).Count);
             List<EnemyWrapper> listOfEnemies = GetEnemyPositions(gameState);
-            int turretDirection = FindEnemyDirection(FindClosestEnemy(listOfEnemies, gameState), gameState);
-            if ((int)currentTurretDirection != turretDirection)
-            {
-                int difference = (int)currentTurretDirection - turretDirection;
+            EnemyWrapper closestEnemy = FindClosestEnemy(listOfEnemies, gameState);
+            int turretDirection = FindEnemyDirection(closestEnemy, gameState);
 
-                if (Math.Abs(difference) == 2)
-                {
-                    BotResponse.Rotate(null, Rotation.Left);
-                    return BotResponse.Rotate(null, Rotation.Left);
-                }
-                else if (difference == -3 || difference == 1)
-                {
-                    return BotResponse.Rotate(null, Rotation.Left);
-                }
-                return BotResponse.Rotate(null, Rotation.Right);
-            }
+            return FaceEnemy((int)currentTurretDirection, turretDirection, closestEnemy, gameState);
         }
 
         return BotResponse.Pass();
     }
+
 
     private BotResponse HandleGaz(GameState gameState)
     {
@@ -266,11 +245,15 @@ public class Bot : IBot
     private State CalculateCurrentState(GameState gameState)
     {
         List<EnemyWrapper> enemies = this.GetEnemyPositions(gameState);
+        PositionWrapper? playerPos = this.GetPlayerPosition(gameState);
+        List<string> intersections = this.GetEnemiesIntersectingWithPlayers(enemies, playerPos, gameState);
         bool isInZone = AmInZone(gameState);
 
-        if (isInZone)
+        if (isInZone || wasAlreadyInZone)
         {
-            if(enemies.Count == 0)
+            wasAlreadyInZone = true;
+
+            if(intersections.Count == 0)
             {
                 if(this.currentTankType == TankType.Heavy)
                 {
@@ -295,13 +278,98 @@ public class Bot : IBot
         return BotResponse.CaptureZone();
     }
 
+    private List<PositionWrapper> getPositionsAroundZone(GameState gameState)
+    {
+        Zone z = gameState.Zones[0];
+
+        List<PositionWrapper> positionsToCheck = new List<PositionWrapper>
+        {
+            new PositionWrapper(z.X, z.Y),
+            new PositionWrapper(z.X+1, z.Y),
+            new PositionWrapper(z.X+2, z.Y),
+            new PositionWrapper(z.X+3, z.Y),
+            new PositionWrapper(z.X+3, z.Y+1),
+            new PositionWrapper(z.X+3, z.Y+2),
+            new PositionWrapper(z.X+3, z.Y+3),
+            new PositionWrapper(z.X+2, z.Y+3),
+            new PositionWrapper(z.X+1, z.Y+3),
+            new PositionWrapper(z.X, z.Y+3),
+            new PositionWrapper(z.X, z.Y+2),
+            new PositionWrapper(z.X, z.Y+1)
+        };
+        List<PositionWrapper> filteredResult = new List<PositionWrapper>();
+
+        for (int i = 0; i < positionsToCheck.Count; i++)
+        {
+            PositionWrapper currentCoords = positionsToCheck[i];
+            Tile.TileEntity[] te = gameState.Map[currentCoords.y, currentCoords.x].Entities;
+
+            if (te.Length == 0)
+            {
+                filteredResult.Add(currentCoords);
+                continue;
+            }
+
+            foreach (Tile.TileEntity t in te)
+            {
+                if ((t is not Tile.Wall) && (t is not Tile.OwnHeavyTank) && (t is not Tile.EnemyHeavyTank) && (t is not Tile.EnemyLightTank))
+                {
+
+                    filteredResult.Add(currentCoords);
+                }
+            }
+        }
+
+        if(filteredResult.Count == 0)
+        {
+            filteredResult.Add(new PositionWrapper(z.X+2, z.Y+2));
+        }
+        return filteredResult;
+    }
+
     private BotResponse HandleLightDefense(GameState gameState)
     {
-        List<EnemyWrapper> enemies = this.GetEnemyPositions(gameState);
-        PositionWrapper? currentPlayerPosition = this.GetPlayerPosition(gameState);
-        List<string> intersections = this.GetEnemiesIntersectingWithPlayers(enemies, currentPlayerPosition, gameState);
+        PositionWrapper playerPos = this.GetPlayerPosition(gameState);
+        if(playerPos == null)
+        {
+            return BotResponse.Pass();
+        }
 
-        return BotResponse.Pass();         
+        Tile.OwnLightTank myTank = this.GetMyLightTank(playerPos, gameState);
+
+        if (myTank == null)
+        {
+            return BotResponse.Pass();
+        }
+
+        if(myTank.TicksToRadar <= 0 || myTank.TicksToRadar == null)
+        {
+            return BotResponse.UseAbility(AbilityType.UseRadar);
+        }
+
+        PositionWrapper? currentPos = new PositionWrapper(1,1);
+        if (this.queuedPositions.Count == 0)
+        {
+            this.queuedPositions = this.getPositionsAroundZone(gameState);
+        } else
+        {
+            currentPos = this.queuedPositions[0];
+
+            if(playerPos.x == currentPos.x && playerPos.y == currentPos.y)
+            {
+                if(this.queuedPositions.Count > 0)
+                {
+                    currentPos = this.queuedPositions[0];
+
+                    this.queuedPositions.RemoveAt(0);
+                } else
+                {
+                    currentPos = this.GetValidZoneCoord(gameState);
+                }
+            }
+        }
+
+        return BotResponse.GoTo(currentPos.x, currentPos.y, Rotation.Left, new(0, 1, 2), new(null, null, null, null, null, null));
     }
 
     private List<string> GetEnemiesIntersectingWithPlayers(List<EnemyWrapper> enemies, PositionWrapper player, GameState gameState)
@@ -492,10 +560,89 @@ public class Bot : IBot
         return turretDirection;
     }
 
-
-    private void Attack(EnemyWrapper enemy)
+    private bool isEnemyOnTheSameAxis(EnemyWrapper enemy, GameState gameState)
     {
+        PositionWrapper myPosition = GetPlayerPosition(gameState);
+        if (enemy.position.x == myPosition.x || enemy.position.y == myPosition.y) return true;
+        return false;
+    }
 
+    private BotResponse FaceEnemy(int currentTurretDirection, int turretDirection, EnemyWrapper closestEnemy, GameState gameState)
+    {
+        if ((int)currentTurretDirection != turretDirection)
+        {
+            int difference = (int)currentTurretDirection - turretDirection;
+
+            if (Math.Abs(difference) == 2)
+            {
+                BotResponse.Rotate(null, Rotation.Left);
+                return BotResponse.Rotate(null, Rotation.Left);
+            }
+            else if (difference == -3 || difference == 1)
+            {
+                return BotResponse.Rotate(null, Rotation.Left);
+            }
+            return BotResponse.Rotate(null, Rotation.Right);
+        }
+        return Attack(closestEnemy, gameState);
+    }
+
+    private BotResponse Attack(EnemyWrapper enemy, GameState gameState)
+    {
+        for (int y = 0; y < gameState.Map.GetLength(0); y++)
+        {
+            for (int x = 0; x < gameState.Map.GetLength(1); x++)
+            {
+                Tile tile = gameState.Map[y, x];
+
+                foreach (var entity in gameState.Map[y, x].Entities)
+                {
+                    if (entity is Tile.OwnHeavyTank heavy && isEnemyOnTheSameAxis(enemy, gameState))
+                    {
+                        if (heavy.Turret.TicksToStunBullet == null)
+                        {
+                            return BotResponse.UseAbility(AbilityType.FireStunBullet);
+                        }
+                        else if(heavy.Turret.TicksToLaser == 0)
+                        {
+                            return BotResponse.UseAbility(AbilityType.UseLaser);
+                        }
+                        else if (heavy.Turret.BulletCount != 0)
+                        {
+                            return BotResponse.UseAbility(AbilityType.FireBullet);
+                        }
+                        else
+                        {
+                            return HandleHeavyDefense(gameState);
+                        }
+
+                    }
+                    else if (entity is Tile.OwnLightTank light && isEnemyOnTheSameAxis(enemy, gameState))
+                    {
+                        Console.WriteLine(light.Turret.TicksToDoubleBullet);
+                        if (light.Turret.TicksToStunBullet == null)
+                        {
+                            return BotResponse.UseAbility(AbilityType.FireStunBullet);
+                        }
+                        else if (light.Turret.BulletCount == 0 && light.Turret.TicksToDoubleBullet == null)
+                        {
+                            Console.WriteLine("dublet");
+                            return BotResponse.UseAbility(AbilityType.FireDoubleBullet);
+
+                        }
+                        else if (light.Turret.BulletCount != 0)
+                        {
+                            return BotResponse.UseAbility(AbilityType.FireBullet);
+                        }
+                        else {
+                            return HandleLightDefense(gameState);
+                        }
+
+                    }
+                }
+            }
+        }
+        return BotResponse.Pass();
     }
     private PositionWrapper? GetPlayerPosition(GameState gameState)
     {
@@ -540,6 +687,19 @@ public class Bot : IBot
             }
         }
 
+        return null;
+    }
+
+    private Tile.OwnLightTank? GetMyLightTank(PositionWrapper playerPos, GameState gameState)
+    {
+        Tile t = gameState.Map[playerPos.y, playerPos.x];
+
+        foreach(Tile.TileEntity te in t.Entities) {
+            if(te is Tile.OwnLightTank)
+            {
+                return (Tile.OwnLightTank) te;
+            }
+        }
         return null;
     }
 
@@ -594,6 +754,14 @@ public class Bot : IBot
     }
 
     class PositionWrapper {
+        public PositionWrapper() { }
+
+        public PositionWrapper(int x, int y)
+        {
+            this.x = x;
+            this.y = y;
+        }
+
         public int x;
         public int y;
     }
