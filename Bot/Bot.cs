@@ -27,6 +27,7 @@ public class Bot : IBot
         this.currentTankType = this.GetTankType(allPlayers);
 
         Console.WriteLine(this.currentTankType.ToString());
+
     }
 
     private List<LobbyPlayer> concatPlayers(LobbyTeam[] teams)
@@ -68,6 +69,26 @@ public class Bot : IBot
         return null;
     }
 
+    private int[] findMyLocation(GameState gameState)
+    {
+        for (int y = 0; y < gameState.Map.GetLength(0); y++)
+        {
+            for (int x = 0; x < gameState.Map.GetLength(1); x++)
+            {
+                Tile tile = gameState.Map[y, x];
+                foreach (var entity in gameState.Map[y, x].Entities)
+                {
+                    if (entity is Tile.OwnLightTank || entity is Tile.OwnHeavyTank)
+                    {
+                        return new int[] { y, x };
+                    }
+                }
+            }
+                    
+        }
+        return null;
+    }
+
     private bool MatchId(LobbyPlayer lp)
     {
         return lp.Id == this.myId;
@@ -92,6 +113,19 @@ public class Bot : IBot
 
     public BotResponse NextMove(GameState gameState)
     {
+        int[] myLocation = findMyLocation(gameState);
+
+        if (myLocation != null)
+        {
+            Console.WriteLine($"Moja pozycja: Y={myLocation[0]}, X={myLocation[1]}");
+        }
+        else
+        {
+            Console.WriteLine("Nie znaleziono mojego czołgu.");
+        }
+
+        /*
+
         Console.WriteLine($"GameStateId: {gameState.Id}");
         Console.WriteLine($"PlayerId: {gameState.PlayerId}");
         Console.WriteLine($"Tick: {gameState.Tick}");
@@ -272,7 +306,7 @@ public class Bot : IBot
             }
         }
 
-
+        */
 
         //Bot that randomly choses one of all possible bot responses.
         var rand = new Random();
@@ -302,6 +336,7 @@ public class Bot : IBot
             19 => BotResponse.CaptureZone(),
             _ => throw new NotSupportedException(),
         };
+
     }
 
     public void OnGameEnd(GameEnd gameEnd)
