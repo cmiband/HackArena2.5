@@ -93,7 +93,7 @@ public class Bot : IBot
         }
         foreach (var zone in gameState.Zones)
         {
-            if (((zone.X <= pos.x) && pos.x < (zone.X + zone.Width)) && ((zone.Y <= pos.y) && (pos.y < zone.Y + zone.Height)))
+            if (((zone.X <= pos.x) && pos.x <= (zone.X + zone.Width)) && ((zone.Y <= pos.y) && (pos.y <= zone.Y + zone.Height)))
             {
                 return true;
             }
