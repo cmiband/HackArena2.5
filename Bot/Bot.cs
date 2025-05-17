@@ -80,7 +80,8 @@ public class Bot : IBot
     {
         GAZ,
         ZONE,
-        DEF,
+        DEF_HEAVY,
+        DEF_LIGHT,
         OFF
     }
 
@@ -115,10 +116,11 @@ public class Bot : IBot
     {
         switch (playerState)
         {
-            case State.DEF:
+            case State.DEF_LIGHT:
                 Console.WriteLine("DEF");
-                return this.HandleDefense(gameState);
-
+                return this.HandleLightDefense(gameState);
+            case State.DEF_HEAVY: 
+              return this.HandleHeavyDefense(gameState);
             case State.GAZ:
                 Console.WriteLine("GAZ");
                 return this.HandleGaz(gameState);
@@ -245,7 +247,14 @@ public class Bot : IBot
         {
             if(enemies.Count == 0)
             {
-                return State.DEF;
+                if(this.currentTankType == TankType.Heavy)
+                {
+                    return State.DEF_HEAVY;
+                }
+                else
+                {
+                    return State.DEF_LIGHT;
+                }
             } 
             else
             {
@@ -256,7 +265,12 @@ public class Bot : IBot
         return State.GAZ;
     }
 
-    private BotResponse HandleDefense(GameState gameState)
+    private BotResponse HandleHeavyDefense(GameState gameState)
+    {
+        return BotResponse.Pass();
+    }
+
+    private BotResponse HandleLightDefense(GameState gameState)
     {
         List<EnemyWrapper> enemies = this.GetEnemyPositions(gameState);
         PositionWrapper? currentPlayerPosition = this.GetPlayerPosition(gameState);
