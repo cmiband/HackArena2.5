@@ -83,10 +83,21 @@ public class Bot : IBot
         DEF
     }
 
-    public void checkState()
+    public bool AmInZone(GameState gameState)
     {
-        // TODO: zrobić ustawianie na podstawie pozycji strefa czy nie strefa
-        currentState = State.GAZ;
+        var pos = GetPlayerPosition(gameState);
+        if (pos == null)
+        {
+            return false;
+        }
+        foreach (var zone in gameState.Zones)
+        {
+            if (((zone.X < pos.x) && pos.x < (zone.X + zone.Width)) && ((zone.Y < pos.y) && (pos.y < zone.Y + zone.Height)))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     public void OnSubsequentLobbyData(LobbyData lobbyData) { }
