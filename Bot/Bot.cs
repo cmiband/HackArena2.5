@@ -296,7 +296,7 @@ public class Bot : IBot
                 Console.WriteLine($"      Key: {key} Value: {value}");
             }
         */
-        this.currentState = this.CalculateCurrentState();
+        this.currentState = this.CalculateCurrentState(gameState);
         BotResponse response = this.GetBotResponseBasedOnState(this.currentState, gameState);
 
         /*
@@ -338,20 +338,35 @@ public class Bot : IBot
         switch(playerState)
         {
             case State.DEF:
+                Console.WriteLine("DEF");
                 return this.HandleDefense(gameState);
+
+            case State.GAZ:
+                Console.WriteLine("GAZ");
+                return this.HandleGaz(gameState);
 
             default:
                 return BotResponse.Pass();
         }
     }
 
-    private State CalculateCurrentState()
+    private BotResponse HandleGaz(GameState gameState)
     {
-        State result = State.DEF;
+        return BotResponse.GoTo(4, 10, Rotation.Left, new(0, 1, 2), new(null, null, null, null, null, null));
+    }
 
-
-
-        return result;
+    private State CalculateCurrentState(GameState gameState)
+    {
+        if (AmInZone(gameState))
+        {
+            //jestesmy w strefie, tutaj dalsze decyzje, na razie DEF na twardo dany
+            return State.DEF;
+        }
+        else
+        {
+            //nie ma nas w strefie, zapierdalamy do strefy
+            return State.GAZ;
+        }
     }
 
     private BotResponse HandleDefense(GameState gameState)
